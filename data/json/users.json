@@ -1,0 +1,24 @@
+[
+  {
+    "id": "tJIDP9B-k_YQsxGvLRttk",
+    "name": "Rahul",
+    "phone": "9000000001",
+    "city": "Mumbai",
+    "locality": "Bandra West",
+    "lat": 19.0596,
+    "lng": 72.8295,
+    "isVerified": false,
+    "createdAt": "2026-05-19T09:39:42.986Z"
+  },
+  {
+    "id": "EIHNTcAVdcAZBo-LihInx",
+    "name": "Rahul2",
+    "phone": "9000000002",
+    "city": "Mumbai",
+    "locality": "Bandra West",
+    "lat": 19.0596,
+    "lng": 72.8295,
+    "isVerified": true,
+    "createdAt": "2026-05-19T09:40:02.734Z"
+  }
+]
