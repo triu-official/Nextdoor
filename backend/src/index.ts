@@ -1,50 +1,103 @@
-import cors from 'cors';
 import express from 'express';
-import { errorHandler } from './middleware/errorHandler';
-import { createRepositories } from './persistence/factory';
+import cors from 'cors';
 import { authRouter } from './routes/auth';
-import { businessRouter } from './routes/businesses';
-import { circlesRouter } from './routes/circles';
-import { feedRouter } from './routes/feed';
 
-async function bootstrap(): Promise<void> {
-  const app = express();
-  const persistenceMode = process.env.PERSISTENCE_MODE ?? 'json';
-  const repos = await createRepositories(persistenceMode);
-  const otpStore = new Map<string, string>();
+const app = express();
 
-  app.use(cors());
-  app.use(express.json());
-  app.use((req, _res, next) => {
-    console.log(`${req.method} ${req.path}`);
-    next();
+app.use(cors());
+app.use(express.json());
+
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  next();
+});
+
+app.use('/api/auth', authRouter);
+
+// Posts endpoints for e2e testing later
+import { postsDb, businessesDb } from './storage/db';
+import { nanoid } from 'nanoid';
+import { authenticate } from './middleware/auth';
+
+app.post('/api/posts', authenticate, async (req, res) => {
+  const { content } = req.body;
+  if (!content) return res.status(400).json({ error: 'Content required' });
+  const post = await postsDb.insert({
+    id: nanoid(),
+    // @ts-ignore
+    userId: req.user.id,
+    authorName: (req as any).user.name,
+    content,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    version: 1
   });
+  res.status(201).json({ post });
+});
 
-  app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', persistenceMode });
+app.get('/api/posts', authenticate, async (req, res) => {
+  const posts = await postsDb.readAll();
+  res.status(200).json({ posts });
+});
+
+app.get('/api/businesses', authenticate, async (req, res) => {
+  const businesses = await businessesDb.readAll();
+  res.status(200).json({ businesses });
+});
+
+// Societies and Channels (Community Circles)
+import { societiesDb, channelsDb, messagesDb, commentsDb } from './storage/db';
+
+app.get('/api/societies', authenticate, async (req, res) => {
+  const societies = await societiesDb.readAll();
+  res.status(200).json({ societies });
+});
+
+app.get('/api/channels/:societyId', authenticate, async (req, res) => {
+  const channels = await channelsDb.readAll();
+  const filtered = channels.filter((c: any) => c.societyId === req.params.societyId);
+  res.status(200).json({ channels: filtered });
+});
+
+app.get('/api/messages/:channelId', authenticate, async (req, res) => {
+  const messages = await messagesDb.readAll();
+  const filtered = messages.filter((m: any) => m.channelId === req.params.channelId);
+  res.status(200).json({ messages: filtered });
+});
+
+app.post('/api/messages/:channelId', authenticate, async (req, res) => {
+  const message = await messagesDb.insert({
+    id: nanoid(),
+    channelId: req.params.channelId,
+    // @ts-ignore
+    userId: req.user.id,
+    authorName: (req as any).user.name,
+    content: req.body.content,
+    createdAt: new Date().toISOString()
   });
+  res.status(201).json({ message });
+});
 
-  app.get('/api/users/:id', async (req, res) => {
-    const user = await repos.users.findById(req.params.id);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    return res.json({ user });
+app.post('/api/posts/:postId/comments', authenticate, async (req, res) => {
+  const comment = await commentsDb.insert({
+    id: nanoid(),
+    postId: req.params.postId,
+    // @ts-ignore
+    userId: req.user.id,
+    authorName: (req as any).user.name,
+    content: req.body.content,
+    createdAt: new Date().toISOString()
   });
+  res.status(201).json({ comment });
+});
 
-  app.use('/api/auth', authRouter(repos, otpStore));
-  app.use('/api', feedRouter(repos));
-  app.use('/api', businessRouter(repos));
-  app.use('/api', circlesRouter(repos));
-  app.use(errorHandler);
+app.get('/api/posts/:postId/comments', authenticate, async (req, res) => {
+  const comments = await commentsDb.readAll();
+  const filtered = comments.filter((c: any) => c.postId === req.params.postId);
+  res.status(200).json({ comments: filtered });
+});
 
-  const port = Number(process.env.PORT ?? 4000);
-  app.listen(port, () => {
-    console.log(`Server listening on http://localhost:${port}`);
-  });
-}
-
-bootstrap().catch((error) => {
-  console.error(error);
-  process.exit(1);
+const port = Number(process.env.PORT || 4000);
+app.listen(port, () => {
+  console.log(`Server listening on http://localhost:${port}`);
 });
