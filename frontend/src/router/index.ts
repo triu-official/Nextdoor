@@ -5,6 +5,8 @@ const Home = () => import('../pages/Home.vue')
 const Login = () => import('../pages/Login.vue')
 const Businesses = () => import('../pages/Businesses.vue')
 const Circles = () => import('../pages/Circles.vue')
+const Offline = () => import('../pages/Offline.vue')
+const NotFound = () => import('../pages/NotFound.vue')
 
 const router = createRouter({
   history: createWebHistory(),
@@ -32,12 +34,27 @@ const router = createRouter({
       name: 'Circles',
       component: Circles,
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/offline',
+      name: 'Offline',
+      component: Offline
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'NotFound',
+      component: NotFound
     }
   ]
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
+
+  if (!authStore.isInitialized) {
+    await authStore.checkAuth()
+  }
+
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')
   } else if (to.path === '/login' && authStore.isAuthenticated) {

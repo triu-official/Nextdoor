@@ -23,12 +23,12 @@ interface LocalDB extends DBSchema {
 
 let dbPromise = openDB<LocalDB>('saltedhash-local', 1, {
   upgrade(db) {
-    db.createObjectStore('drafts', { keyPath: 'id' })
-    db.createObjectStore('cachedPosts', { keyPath: 'id' })
+    db.createObjectStore('drafts', { keyPath: '$id' })
+    db.createObjectStore('cachedPosts', { keyPath: '$id' })
   }
 })
 
-export const apiService = {
+export const offlineCache = {
   async saveDraft(draft: any) {
     const db = await dbPromise;
     await db.put('drafts', draft);

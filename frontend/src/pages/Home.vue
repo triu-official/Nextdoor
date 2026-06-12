@@ -13,14 +13,42 @@
         </div>
       </div>
       <div class="mt-3 flex items-center justify-end">
-        <button @click="createPost" :disabled="!newPostContent" :class="['inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-full shadow-sm text-white', newPostContent ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-300 cursor-not-allowed']">
-          Post
+        <button @click="createPost" :disabled="!newPostContent || creatingPost" :class="['inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-full shadow-sm text-white', newPostContent && !creatingPost ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-300 cursor-not-allowed']">
+          {{ creatingPost ? 'Posting...' : 'Post' }}
         </button>
       </div>
     </div>
 
-    <div class="space-y-4">
-      <div v-for="post in posts" :key="post.id" class="bg-white shadow rounded-xl p-5 border border-gray-100 hover:shadow-md transition-shadow">
+    <!-- Drafts Sync -->
+    <div v-if="offlineDrafts.length > 0" class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <svg class="h-5 w-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <div class="ml-3">
+          <p class="text-sm text-yellow-700">
+            You have {{ offlineDrafts.length }} unsynced post draft(s).
+          </p>
+          <button @click="syncDrafts" :disabled="syncing" class="mt-2 text-sm font-medium text-yellow-700 hover:text-yellow-600">
+            {{ syncing ? 'Syncing...' : 'Sync Now' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="loading" class="flex justify-center p-10">
+      <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+    </div>
+
+    <div v-else-if="error" class="text-center py-10 bg-white shadow rounded-xl border border-gray-100">
+      <p class="text-sm text-red-600 mb-2">Failed to load posts. Displaying cached data if available.</p>
+      <button @click="fetchPosts" class="text-indigo-600 text-sm font-medium hover:underline">Retry Connection</button>
+    </div>
+
+    <div v-if="!loading" class="space-y-4">
+      <div v-for="post in posts" :key="post.$id" class="bg-white shadow rounded-xl p-5 border border-gray-100 hover:shadow-md transition-shadow">
         <div class="flex space-x-3">
           <div class="flex-shrink-0">
             <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold">
@@ -29,39 +57,39 @@
           </div>
           <div class="min-w-0 flex-1">
             <p class="text-sm font-medium text-gray-900">
-              {{ post.authorName || post.userId }}
+              {{ post.authorName }}
             </p>
             <p class="text-xs text-gray-500">
-              {{ new Date(post.createdAt).toLocaleString() }}
+              {{ new Date(post.$createdAt).toLocaleString() }}
             </p>
           </div>
         </div>
         <div class="mt-4 text-gray-800 whitespace-pre-wrap">
           {{ post.content }}
         </div>
-        <!-- Comments mock for MVP -->
+
         <div class="mt-4 pt-4 border-t border-gray-100">
-           <div class="flex items-center space-x-2 text-gray-500 text-sm mb-2 cursor-pointer hover:text-indigo-600 transition-colors" @click="toggleComments(post.id)">
+           <div class="flex items-center space-x-2 text-gray-500 text-sm mb-2 cursor-pointer hover:text-indigo-600 transition-colors" @click="toggleComments(post.$id)">
              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-             <span>{{ activeComments[post.id] ? 'Hide Comments' : 'Show Comments' }}</span>
+             <span>{{ activeComments[post.$id] ? 'Hide Comments' : 'Show Comments' }}</span>
            </div>
 
-           <div v-if="activeComments[post.id]">
-             <div v-if="commentsLoading[post.id]" class="text-xs text-gray-400 my-2">Loading...</div>
+           <div v-if="activeComments[post.$id]">
+             <div v-if="commentsLoading[post.$id]" class="text-xs text-gray-400 my-2">Loading...</div>
              <div v-else class="space-y-3 mb-3">
-               <div v-for="comment in postComments[post.id] || []" :key="comment.id" class="bg-gray-50 p-3 rounded-lg text-sm border border-gray-100">
+               <div v-for="comment in postComments[post.$id] || []" :key="comment.$id" class="bg-gray-50 p-3 rounded-lg text-sm border border-gray-100">
                  <div class="font-medium text-gray-800 mb-1 flex justify-between">
-                   <span>{{ comment.authorName || comment.userId }}</span>
-                   <span class="text-xs text-gray-400 font-normal">{{ new Date(comment.createdAt).toLocaleDateString() }}</span>
+                   <span>{{ comment.authorName }}</span>
+                   <span class="text-xs text-gray-400 font-normal">{{ new Date(comment.$createdAt).toLocaleDateString() }}</span>
                  </div>
                  <p class="text-gray-600">{{ comment.content }}</p>
                </div>
-               <p v-if="!(postComments[post.id] || []).length" class="text-xs text-gray-400 italic">No comments yet.</p>
+               <p v-if="!(postComments[post.$id] || []).length" class="text-xs text-gray-400 italic">No comments yet.</p>
              </div>
 
              <div class="flex items-center mt-2 space-x-2">
-               <input v-model="newComment[post.id]" type="text" placeholder="Add a comment..." class="flex-1 rounded-full border-gray-300 bg-gray-50 text-sm px-4 py-2 border focus:ring-indigo-500 focus:border-indigo-500" @keyup.enter="postComment(post.id)">
-               <button @click="postComment(post.id)" :disabled="!newComment[post.id]" class="bg-indigo-100 text-indigo-600 rounded-full px-4 py-2 text-sm font-medium hover:bg-indigo-200 disabled:opacity-50">Reply</button>
+               <input v-model="newComment[post.$id]" type="text" placeholder="Add a comment..." class="flex-1 rounded-full border-gray-300 bg-gray-50 text-sm px-4 py-2 border focus:ring-indigo-500 focus:border-indigo-500" @keyup.enter="postComment(post.$id)">
+               <button @click="postComment(post.$id)" :disabled="!newComment[post.$id]" class="bg-indigo-100 text-indigo-600 rounded-full px-4 py-2 text-sm font-medium hover:bg-indigo-200 disabled:opacity-50">Reply</button>
              </div>
            </div>
         </div>
@@ -81,11 +109,18 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
-import { apiService } from '../services/api'
+import { databases, APPWRITE_CONFIG, ID, Query } from '../services/appwrite'
+import { offlineCache } from '../services/offlineCache'
 
 const authStore = useAuthStore()
 const posts = ref<any[]>([])
 const newPostContent = ref('')
+const loading = ref(true)
+const error = ref(false)
+const creatingPost = ref(false)
+
+const offlineDrafts = ref<any[]>([])
+const syncing = ref(false)
 
 const activeComments = ref<Record<string, boolean>>({})
 const postComments = ref<Record<string, any[]>>({})
@@ -93,70 +128,110 @@ const commentsLoading = ref<Record<string, boolean>>({})
 const newComment = ref<Record<string, string>>({})
 
 const fetchPosts = async () => {
+  loading.value = true
+  error.value = false
   try {
-    const res = await fetch('/api/posts', {
-      headers: {
-        'Authorization': `Bearer ${authStore.token}`
-      }
-    })
-    if (!res.ok) throw new Error('Failed to fetch from server')
-    const data = await res.json()
-    posts.value = data.posts || []
+    const response = await databases.listDocuments(
+      APPWRITE_CONFIG.databaseId,
+      APPWRITE_CONFIG.collections.posts,
+      [Query.orderDesc('$createdAt'), Query.limit(20)]
+    )
+    posts.value = response.documents
 
-    // Update local cache
-    await apiService.cachePosts(posts.value)
+    await offlineCache.cachePosts(posts.value)
+
+    // Auto sync on successful fetch
+    await checkDrafts()
+    if (offlineDrafts.value.length > 0) {
+      await syncDrafts()
+    }
   } catch (err) {
     console.warn('Network fetch failed, loading from local cache', err)
-    posts.value = await apiService.getCachedPosts()
+    posts.value = await offlineCache.getCachedPosts()
+    error.value = true
+  } finally {
+    loading.value = false
+  }
+}
+
+const checkDrafts = async () => {
+  const drafts = await offlineCache.getDrafts()
+  offlineDrafts.value = drafts
+}
+
+const syncDrafts = async () => {
+  if (syncing.value || offlineDrafts.value.length === 0) return
+  syncing.value = true
+  try {
+    for (const draft of offlineDrafts.value) {
+      await databases.createDocument(
+        APPWRITE_CONFIG.databaseId,
+        APPWRITE_CONFIG.collections.posts,
+        ID.unique(),
+        {
+          content: draft.content,
+          userId: draft.userId,
+          authorName: draft.authorName.replace(' (Draft)', '')
+        }
+      )
+      await offlineCache.removeDraft(draft.$id)
+    }
+    await checkDrafts()
+    await fetchPosts()
+  } catch (err) {
+    console.error('Failed to sync drafts', err)
+  } finally {
+    syncing.value = false
   }
 }
 
 const createPost = async () => {
+  if (!newPostContent.value) return
+  creatingPost.value = true
+
   try {
-    const res = await fetch('/api/posts', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authStore.token}`
-      },
-      body: JSON.stringify({
-        content: newPostContent.value
-      })
-    })
-    if (res.ok) {
-      newPostContent.value = ''
-      await fetchPosts()
-    } else {
-      throw new Error('Server error')
-    }
+    await databases.createDocument(
+      APPWRITE_CONFIG.databaseId,
+      APPWRITE_CONFIG.collections.posts,
+      ID.unique(),
+      {
+        content: newPostContent.value,
+        userId: authStore.user.$id,
+        authorName: authStore.user.name
+      }
+    )
+    newPostContent.value = ''
+    await fetchPosts()
   } catch (err) {
     console.warn('Network down, saving as draft offline', err)
     const draft = {
-      id: `draft-${Date.now()}`,
+      $id: `draft-${Date.now()}`,
       content: newPostContent.value,
-      createdAt: new Date().toISOString()
+      $createdAt: new Date().toISOString(),
+      userId: authStore.user.$id,
+      authorName: authStore.user.name + ' (Draft)'
     }
-    await apiService.saveDraft(draft)
-
-    // Optimistically add to list
-    posts.value.unshift({
-      ...draft,
-      authorName: authStore.user?.name || 'You (Draft)'
-    })
+    await offlineCache.saveDraft(draft)
+    posts.value.unshift(draft)
     newPostContent.value = ''
+    await checkDrafts()
+  } finally {
+    creatingPost.value = false
   }
 }
 
 const fetchComments = async (postId: string) => {
   commentsLoading.value[postId] = true
   try {
-    const res = await fetch(`/api/posts/${postId}/comments`, {
-      headers: { 'Authorization': `Bearer ${authStore.token}` }
-    })
-    const data = await res.json()
-    if (res.ok) {
-      postComments.value[postId] = data.comments || []
-    }
+    const response = await databases.listDocuments(
+      APPWRITE_CONFIG.databaseId,
+      APPWRITE_CONFIG.collections.comments,
+      [
+        Query.equal('postId', postId),
+        Query.orderAsc('$createdAt')
+      ]
+    )
+    postComments.value[postId] = response.documents
   } catch (err) {
     console.error('Failed to fetch comments', err)
   } finally {
@@ -176,24 +251,26 @@ const postComment = async (postId: string) => {
   if (!content) return
 
   try {
-    const res = await fetch(`/api/posts/${postId}/comments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authStore.token}`
-      },
-      body: JSON.stringify({ content })
-    })
-    if (res.ok) {
-      newComment.value[postId] = ''
-      await fetchComments(postId)
-    }
+    await databases.createDocument(
+      APPWRITE_CONFIG.databaseId,
+      APPWRITE_CONFIG.collections.comments,
+      ID.unique(),
+      {
+        content,
+        postId,
+        userId: authStore.user.$id,
+        authorName: authStore.user.name
+      }
+    )
+    newComment.value[postId] = ''
+    await fetchComments(postId)
   } catch (err) {
     console.error('Failed to post comment', err)
   }
 }
 
-onMounted(() => {
-  fetchPosts()
+onMounted(async () => {
+  await checkDrafts()
+  await fetchPosts()
 })
 </script>

@@ -13,11 +13,12 @@ export default defineConfig({
         enabled: true
       },
       manifest: {
-        name: 'SaltedHash Local Feed',
-        short_name: 'LocalFeed',
-        theme_color: '#ffffff',
+        name: 'SALTEDHASH',
+        short_name: 'SALTEDHASH',
+        theme_color: '#4f46e5',
         background_color: '#ffffff',
         display: 'standalone',
+        start_url: '/',
         icons: [
           {
             src: '/icons/icon-192x192.png',
@@ -56,14 +57,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')
-    }
-  },
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:4000',
-        changeOrigin: true
-      }
     }
   }
 })

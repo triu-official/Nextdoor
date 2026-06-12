@@ -9,8 +9,13 @@
       <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
     </div>
 
+    <div v-else-if="error" class="text-center py-10 bg-white shadow rounded-xl border border-gray-100">
+      <p class="text-sm text-red-600 mb-2">Failed to load businesses.</p>
+      <button @click="fetchBusinesses" class="text-indigo-600 text-sm font-medium hover:underline">Retry</button>
+    </div>
+
     <div v-else class="grid grid-cols-1 gap-4">
-      <div v-for="biz in businesses" :key="biz.id" class="bg-white rounded-xl shadow border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+      <div v-for="biz in businesses" :key="biz.$id" class="bg-white rounded-xl shadow border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
         <div class="p-5">
           <div class="flex items-center justify-between mb-2">
             <h3 class="text-lg font-bold text-gray-900">{{ biz.name }}</h3>
@@ -39,25 +44,24 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useAuthStore } from '../stores/auth'
+import { databases, APPWRITE_CONFIG } from '../services/appwrite'
 
-const authStore = useAuthStore()
 const businesses = ref<any[]>([])
 const loading = ref(true)
+const error = ref(false)
 
 const fetchBusinesses = async () => {
+  loading.value = true
+  error.value = false
   try {
-    const res = await fetch('/api/businesses', {
-      headers: {
-        'Authorization': `Bearer ${authStore.token}`
-      }
-    })
-    const data = await res.json()
-    if (res.ok) {
-      businesses.value = data.businesses || []
-    }
+    const response = await databases.listDocuments(
+      APPWRITE_CONFIG.databaseId,
+      APPWRITE_CONFIG.collections.businesses
+    )
+    businesses.value = response.documents
   } catch (err) {
     console.error('Failed to fetch businesses', err)
+    error.value = true
   } finally {
     loading.value = false
   }

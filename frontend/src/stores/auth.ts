@@ -1,26 +1,35 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { account } from '../services/appwrite'
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref(localStorage.getItem('token') || null)
-  const isAuthenticated = ref(!!token.value)
-  const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
+  const isAuthenticated = ref(false)
+  const user = ref<any>(null)
+  const isInitialized = ref(false)
 
-  function login(userData: any, jwtToken: string) {
-    isAuthenticated.value = true
-    user.value = userData
-    token.value = jwtToken
-    localStorage.setItem('user', JSON.stringify(userData))
-    localStorage.setItem('token', jwtToken)
+  async function checkAuth() {
+    try {
+      const session = await account.get()
+      user.value = session
+      isAuthenticated.value = true
+    } catch (err) {
+      user.value = null
+      isAuthenticated.value = false
+    } finally {
+      isInitialized.value = true
+    }
   }
 
-  function logout() {
-    isAuthenticated.value = false
-    user.value = null
-    token.value = null
-    localStorage.removeItem('user')
-    localStorage.removeItem('token')
+  async function logout() {
+    try {
+      await account.deleteSession('current')
+    } catch (err) {
+      console.error('Logout error:', err)
+    } finally {
+      isAuthenticated.value = false
+      user.value = null
+    }
   }
 
-  return { isAuthenticated, user, token, login, logout }
+  return { isAuthenticated, user, isInitialized, checkAuth, logout }
 })

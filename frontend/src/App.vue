@@ -36,6 +36,8 @@
           <span class="text-xs font-medium">Logout</span>
         </button>
       </nav>
+
+      <ReloadPrompt />
     </div>
   </div>
 </template>
@@ -43,12 +45,13 @@
 <script setup lang="ts">
 import { useAuthStore } from './stores/auth'
 import { useRouter } from 'vue-router'
+import ReloadPrompt from './components/pwa/ReloadPrompt.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
 
-const logout = () => {
-  authStore.logout()
+const logout = async () => {
+  await authStore.logout()
   router.push('/login')
 }
 </script>
